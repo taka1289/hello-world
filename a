@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+</head>
+<body>
+  <!-- Mount the instance within a <label> -->
+  <!-- actionでトークン送信先サーバのURL指定 -->
+  <form action="http://localhost:/tokens" method="post" id="payment-form">
+    <div class="form-row">
+      <label for="card-number-element"></label>
+      <label for="card-expiry-element"></label>
+      <label for="card-cvc-element"></label>
+
+      <div id="card-number-element">
+        <!-- カード番号フォームがここに入る -->
+      </div>
+      <div id="card-expiry-element">
+        <!-- 有効期限フォームがここに入る -->
+      </div>
+      <div id="card-cvc-element">
+        <!-- CVCフォームがここに入る -->
+      </div>
+      
+      <!-- Element のエラー -->
+      <div id="card-errors" role="alert"></div>
+    </div>
+      
+    <button>送信</button>
+  </form>
+      
+  <!-- 入力エラー表示 -->
+  <div id="card-errors" role="alert"></div>
+</body>
+<script src="https://js.stripe.com/v3/"></script>
+<script type="text/javascript">
+    (function (){
+        const PUBLIC_KEY = '';
+        const stripe = Stripe(PUBLIC_KEY);
+        const elements = stripe.elements();
+
+        const style = {
+            base: {
+                fontSize: '16px',
+            },
+        };
+
+        const cardNumberElement = elements.create('cardNumber', {
+            placeholder: 'クレジット・デビットカード番号',
+            style: style,
+        });
+        const cardExpiryElement = elements.create('cardExpiry', {
+            placeholder: '有効期限',
+            style: style,
+        });
+        const cardCvcElement = elements.create('cardCvc', {
+            placeholder: 'CVC',
+            style: style,
+        });
+
+        // DOM（フォーム）にマウント
+        cardNumberElement.mount('#card-number-element');
+        cardExpiryElement.mount('#card-expiry-element');
+        cardCvcElement.mount('#card-cvc-element');
+
+        const errorDisplay = document.getElementById('card-errors');
+
+        // フォームの入力内容が変わるたびに走る処理
+        cardNumberElement.on('change', updateErrorDisplay);
+        cardExpiryElement.on('change', updateErrorDisplay);
+        cardCvcElement.on('change', updateErrorDisplay);
+
+        const form = document.getElementById('payment-form');
+        // フォーム送信
+        form.addEventListener('submit', event => {
+            // NOTE: フォーム送信イベントをキャンセル
+            // （トークン情報を取得してから改めて送信するため)
+            event.preventDefault();
+
+            // フォームのカード情報をもとにトークンを発行
+            stripe.createToken(cardNumberElement)
+                .then(result => {
+                    if (result.error) {
+                        errorDisplay.textContent = result.error;
+                        return;
+                    }
+                    // トークンを取得しサーバーへ送信
+                    postTokenToServer(result.token);
+                })
+                .catch(err => {
+                    errorDisplay.textContent = err;
+                });
+        });
+
+        function updateErrorDisplay(event) {
+            if (event.complete) {
+                // 成功時処理
+                errorDisplay.textContent = '';
+            }
+            if (event.error) {
+                // バリデーションエラー表示
+                errorDisplay.textContent = event.error.massage;
+            }
+        }
+        
+        function postTokenToServer(token) {
+            // tokenをフォームへ包含し送信
+            const form = document.getElementById('payment-form');
+            const hiddenInput = document.createElement('input');
+            hiddenInput.setAttribute('type', 'hidden');
+            hiddenInput.setAttribute('name', 'stripeToken');
+            hiddenInput.setAttribute('value', token.id);
+            form.appendChild(hiddenInput);
+
+            form.submit();
+        }
+    })();
+</script>
